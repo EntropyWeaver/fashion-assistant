@@ -1,0 +1,45 @@
+# Entornos virtuales
+env/
+.venv/
+ENV/
+env.bak/
+venv/
+
+# Archivos de entorno
+.env
+*.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos temporales y logs
+*.log
+*.tmp
+*.bak
+temp/
+temp/*
+
+# Jupyter Notebooks Checkpoints (si acaso usas alguno)
+.ipynb_checkpoints
+
+# VSCode
+.vscode/
+
+# Streamlit cache
+.streamlit/
+.streamlit/cache/
+
+# Modelos o embeddings locales (si son grandes)
+models/
+*.pt
+*.pth
+*.h5
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Carpeta de datos (si no es pública)
+data/
