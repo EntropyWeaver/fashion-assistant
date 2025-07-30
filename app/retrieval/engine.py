@@ -21,8 +21,6 @@ import faiss
 import torch
 import open_clip
 from PIL import Image
-from io import BytesIO
-import base64
 
 class RetrievalEngine:
     """
@@ -89,11 +87,7 @@ class RetrievalEngine:
             A 2D numpy array with shape (1, embedding_dim) and dtype
             ``float32``.  The embedding is L2-normalised.
         """
-        try:
-            image = Image.open(image_path).convert("RGB")
-        except Exception as e:
-            print(f"❌ No se pudo abrir la imagen: {image_path} → {e}")
-            raise
+        image = Image.open(image_path).convert("RGB")
         image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
             emb = self.model.encode_image(image_tensor)
@@ -139,16 +133,15 @@ class RetrievalEngine:
         # Load dataset and compute embeddings
         embeddings, labels = self._load_dataset_images()
         # Build FAISS index
-        faiss.normalize_L2(embeddings)
-        index = faiss.IndexFlatIP(embeddings.shape[1])
+        dim = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dim)
         index.add(embeddings)
-        
         # Save index and labels
         self.index = index
         self.labels = pd.DataFrame(labels, columns=["filename", "category"])
 
-    def search(self, query_image_path: str, k: int = 5, threshold: float = 0.6) -> List[Dict[str, object]]:
-        """Find the top ``k`` most similar images for a query image exceeding a similarity threshold.
+    def search(self, query_image_path: str, k: int = 5) -> List[Dict[str, object]]:
+        """Find the top ``k`` most similar images for a query image.
 
         Parameters
         ----------
@@ -161,29 +154,25 @@ class RetrievalEngine:
         -------
         list of dict
             A list of dictionaries, each containing the keys ``image``
-            (absolute file path), ``category`` and ``similarity`` (cosine
-            similarity in embedding space rounded to four decimals).
+            (absolute file path), ``category`` and ``distance`` (Euclidean
+            distance in embedding space rounded to four decimals).
         """
         if self.index is None or self.labels is None:
             raise RuntimeError("El índice aún no ha sido construido")
-        
         # Compute embedding for the query image
         emb = self._get_embedding(query_image_path)
         # Perform the search.  FAISS returns D and I arrays where D
-        # contains similarities and I contains indices into the labels
+        # contains distances and I contains indices into the labels
         # DataFrame.  Note: FAISS expects shape (1, D) arrays.
-        D, I = self.index.search(emb, k,)
+        D, I = self.index.search(emb, k)
         results: List[Dict[str, object]] = []
         for idx, dist in zip(I[0], D[0]):
             row = self.labels.iloc[idx]
-            if dist >= threshold:
-                results.append(
-                    {
-                        "image": row["filename"],
-                        "category": row["category"],
-                        "similarity": round(float(dist), 4),
-                    }
-                )
+            results.append(
+                {
+                    "image": row["filename"],
+                    "category": row["category"],
+                    "distance": round(float(dist), 4),
+                }
+            )
         return results
-        
-    

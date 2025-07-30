@@ -84,13 +84,9 @@ def main() -> None:
 
             # Display similar images
             similar_images: List[str] = result.get("similar_images", [])
-            if not "blocked" in result:
-                st.subheader("Imágenes similares")
-                if not similar_images:
-                    st.write("No se encontraron imágenes similares.")
-            if result.get("blocked"):
-                st.warning(f"**{result['answer']}**")
-                return
+            st.subheader("Imágenes similares")
+            if not similar_images:
+                st.write("No se encontraron imágenes similares.")
             else:
                 for path in similar_images:
                     try:

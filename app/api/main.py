@@ -16,9 +16,7 @@ from fastapi import APIRouter, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.retrieval.engine import RetrievalEngine
-from app.llm.assistant import ask_fashion_assistant
-from ..llm.assistant import contains_offensive_language
-
+from app.services.fashion_advisor import query_fashion_advisor
 
 
 def create_app() -> FastAPI:
@@ -31,7 +29,7 @@ def create_app() -> FastAPI:
     # "/root/data" as described by the user.  Building the index may take
     # some time on the first run but will be reused for subsequent
     # requests.
-    data_root = os.getenv("DATA_ROOT", "data")
+    data_root = os.getenv("DATA_ROOT", "/root/data")
     try:
         retrieval_engine = RetrievalEngine(data_root=data_root)
     except Exception as exc:
@@ -42,82 +40,72 @@ def create_app() -> FastAPI:
 
     @router.post("/query")
     async def query(
-        image: UploadFile = File(..., description="Imagen de prenda"),
-        text: str = Form(..., description="Consulta de moda"),
-        k: int = Form(5, description="Número de similares a recuperar"),
+        image: UploadFile = File(..., description="Imagen de prenda que el usuario sube"),
+        text: str = Form(..., description="Consulta de moda del usuario"),
+        k: int = Form(5, description="Número de imágenes similares a recuperar"),
     ) -> JSONResponse:
-        print("🟢 [DEBUG] Inicio de /query")  # DEBUG
-        
-        # Leer imagen
+        """
+        Encuentra imágenes similares a una consulta y genera un consejo de moda.
+
+        La ruta acepta una imagen de prenda y una consulta escrita en español.
+        Primero, la imagen se guarda temporalmente y se procesa con el motor
+        de recuperación para obtener las `k` imágenes más similares. Luego
+        se construye un prompt que incluye la información de dichas
+        similitudes y la consulta original del usuario. Finalmente se
+        utiliza el modelo de lenguaje para generar una respuesta de moda.
+        """
+        # Guardar la imagen recibida en un fichero temporal dentro de /tmp
         try:
             contents = await image.read()
             if not contents:
                 raise HTTPException(status_code=400, detail="La imagen está vacía")
-            print(f"📦 [DEBUG] Imagen recibida: {image.filename} ({len(contents)} bytes)")  # DEBUG
-        except Exception as e:
-            print("❌ [DEBUG] Error al leer imagen:", e)
-            raise
+        except Exception:
+            raise HTTPException(status_code=400, detail="No se pudo leer la imagen")
 
-        # Guardar imagen temporal en carpeta 'temp'
-        tmp_dir = os.path.join(os.getcwd(), "temp")
+        tmp_dir = "/tmp"
         os.makedirs(tmp_dir, exist_ok=True)
         tmp_path = os.path.join(tmp_dir, image.filename)
         try:
             with open(tmp_path, "wb") as f:
                 f.write(contents)
-            print(f"💾 [DEBUG] Imagen guardada en: {tmp_path}")  # DEBUG
-        except Exception as e:
-            print("❌ [DEBUG] Error al guardar imagen:", e)
+        except Exception:
             raise HTTPException(status_code=500, detail="No se pudo guardar la imagen temporal")
 
-        # FAISS retrieval
+        # Recuperar imágenes similares usando el motor de recuperación
         try:
-            if contains_offensive_language(text):
-                print("🚫 [DEBUG] Solicitud bloqueada por lenguaje ofensivo")
-                return JSONResponse(
-                {
-                    "similar_images": [],
-                    "prompt": text,
-                    "answer": "Lo siento, no puedo ayudarte con esa solicitud.",
-                    "blocked": True
-                },
-                status_code=200,
-            )
-                
-            print("🔍 [DEBUG] Llamando a retrieval_engine.search()")  # DEBUG
             similar_items = retrieval_engine.search(tmp_path, k=max(1, int(k)))
-            print(f"✅ [DEBUG] FAISS devolvió {len(similar_items)} resultados")  # DEBUG
         except Exception as exc:
-            print("❌ [DEBUG] Error en FAISS:", exc)
-            import traceback; traceback.print_exc()
-            raise HTTPException(status_code=500, detail=f"Error en búsqueda FAISS: {exc}")
+            raise HTTPException(status_code=500, detail=f"Error en la búsqueda FAISS: {exc}")
 
-        # LLM call
-        try:
-            print("🤖 [DEBUG] Llamando a ask_fashion_assistant()")  # DEBUG
-            answer, full_prompt = ask_fashion_assistant(user_query=text, similar_images=similar_items)
-            print("✅ [DEBUG] Respuesta generada por LLM")  # DEBUG
-        except Exception as exc:
-            print("❌ [DEBUG] Error en LLM:", exc)
-            import traceback; traceback.print_exc()
-            raise HTTPException(status_code=500, detail=f"Error en el modelo de lenguaje: {exc}")
+        # Enviar la imagen más similar junto con la consulta al modelo GPT‑4o. Si no hay
+        # resultados, se devuelve un mensaje indicativo.
+        if similar_items:
+            top_image_path = similar_items[0]["image"]
+            try:
+                answer = query_fashion_advisor(top_image_path, text)
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"Error en el asesor de moda: {exc}")
+        else:
+            answer = "No se encontraron imágenes similares."
 
-        # Limpieza temporal
+        # Limpiar el archivo temporal
         try:
             os.remove(tmp_path)
-            print("🧹 [DEBUG] Imagen temporal eliminada")  # DEBUG
         except Exception:
+            # No hacemos que el fallo en la limpieza interrumpa la petición
             pass
 
-        print("🔚 [DEBUG] Fin de /query, devolviendo JSON")  # DEBUG
         return JSONResponse(
             {
                 "similar_images": [item["image"] for item in similar_items],
-                "prompt": full_prompt,
                 "answer": answer,
             }
         )
+
     app.include_router(router)
     return app
 
+
+# Instancia global de FastAPI para uvicorn.  Esto permite ejecutar
+# `uvicorn app.api.main:app` directamente.
 app = create_app()
