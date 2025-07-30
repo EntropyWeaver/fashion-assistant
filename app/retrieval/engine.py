@@ -184,13 +184,6 @@ class RetrievalEngine:
                         "similarity": round(float(dist), 4),
                     }
                 )
-        if len(results) == 0:
-            #in case image_path never founds a simmilarity
-            buffer = BytesIO()
-            img = Image.open(query_image_path)
-            img.save(buffer, format='JPEG')
-            enc_img = base64.b64encode(buffer.getvalue()).decode(encoding='utf-8')
-            return enc_img
         return results
         
     
