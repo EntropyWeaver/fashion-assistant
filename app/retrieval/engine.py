@@ -134,13 +134,14 @@ class RetrievalEngine:
         embeddings, labels = self._load_dataset_images()
         # Build FAISS index
         dim = embeddings.shape[1]
-        index = faiss.IndexFlatL2(dim)
+        faiss.normalize_L2(embeddings)
+        index = faiss.IndexFlatIP(dim)
         index.add(embeddings)
         # Save index and labels
         self.index = index
         self.labels = pd.DataFrame(labels, columns=["filename", "category"])
 
-    def search(self, query_image_path: str, k: int = 5) -> List[Dict[str, object]]:
+    def search(self, query_image_path: str, k: int = 5, threshold: float = 0.6) -> List[Dict[str, object]]:
         """Find the top ``k`` most similar images for a query image.
 
         Parameters
@@ -168,11 +169,12 @@ class RetrievalEngine:
         results: List[Dict[str, object]] = []
         for idx, dist in zip(I[0], D[0]):
             row = self.labels.iloc[idx]
-            results.append(
-                {
-                    "image": row["filename"],
-                    "category": row["category"],
-                    "distance": round(float(dist), 4),
-                }
-            )
+            if dist >= threshold:
+                results.append(
+                    {
+                        "image": row["filename"],
+                        "category": row["category"],
+                        "distance": round(float(dist), 4),
+                    }
+                )
         return results

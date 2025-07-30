@@ -8,7 +8,7 @@ language answer. The endpoint accepts an image file and a text prompt
 from the client and returns JSON containing the retrieved image paths,
 the full prompt sent to the LLM and the final answer.
 """
-
+import traceback
 import os
 from typing import List
 
@@ -29,7 +29,7 @@ def create_app() -> FastAPI:
     # "/root/data" as described by the user.  Building the index may take
     # some time on the first run but will be reused for subsequent
     # requests.
-    data_root = os.getenv("DATA_ROOT", "/root/data")
+    data_root = os.getenv("DATA_ROOT", "data")
     try:
         retrieval_engine = RetrievalEngine(data_root=data_root)
     except Exception as exc:
@@ -62,7 +62,7 @@ def create_app() -> FastAPI:
         except Exception:
             raise HTTPException(status_code=400, detail="No se pudo leer la imagen")
 
-        tmp_dir = "/tmp"
+        tmp_dir = "temp"
         os.makedirs(tmp_dir, exist_ok=True)
         tmp_path = os.path.join(tmp_dir, image.filename)
         try:
@@ -77,16 +77,21 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Error en la búsqueda FAISS: {exc}")
 
+        #Usar todas las imagenes que devuelva FAISS
+        image_paths: List[str]
+        if similar_items:
+            image_paths = [item["image"] for item in similar_items]
+        else:
+            image_paths = [tmp_path]
         # Enviar la imagen más similar junto con la consulta al modelo GPT‑4o. Si no hay
         # resultados, se devuelve un mensaje indicativo.
-        if similar_items:
-            top_image_path = similar_items[0]["image"]
-            try:
-                answer = query_fashion_advisor(top_image_path, text)
-            except Exception as exc:
-                raise HTTPException(status_code=500, detail=f"Error en el asesor de moda: {exc}")
-        else:
-            answer = "No se encontraron imágenes similares."
+        
+        try:
+            answer = query_fashion_advisor(image_paths, text)
+        except Exception as exc:
+            print("🧨 Excepción al llamar a query_fashion_advisor():", exc)
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail="Error interno al generar la respuesta.")
 
         # Limpiar el archivo temporal
         try:

@@ -13,13 +13,32 @@ from __future__ import annotations
 
 import os
 from typing import Tuple
-
-import openai
+import mimetypes
+from typing import List
+from openai import OpenAI
+from load_dotenv import load_dotenv
 
 from app.utils.image_encoding import encode_image_to_base64
 
+load_dotenv()
 
-def query_fashion_advisor(image_path: str, user_prompt: str, model: str = "gpt-4o") -> str:
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+def get_data_url(image_path: str) -> str:
+    """Codifica una imagen como data URL si su tipo MIME está permitido.
+    """
+    mime_type, _ = mimetypes.guess_type(image_path)
+    if mime_type not in ALLOWED_MIME_TYPES:
+        raise ValueError(f"Formato de imagen no soportado: {mime_type}")
+
+    encoded = encode_image_to_base64(image_path)
+    return f"data:{mime_type};base64,{encoded}"
+
+
+
+def query_fashion_advisor(image_paths: List[str],
+                          user_prompt: str,
+                          model: str = "gpt-4o") -> str:
     """Query the GPT‑4o model with a multimodal prompt consisting of text and an image.
 
     Parameters
@@ -44,12 +63,25 @@ def query_fashion_advisor(image_path: str, user_prompt: str, model: str = "gpt-4
         raise EnvironmentError(
             "La variable de entorno OPENAI_API_KEY no está configurada. Establece tu clave de API de OpenAI."
         )
-
+    # Coding all valid imgsas URLs data
+    image_blocks = []
+    for path in image_paths:
+        try:
+            data_url = get_data_url(path)
+            image_blocks.append({"type": "image_url",
+                                 "image_url": {"url": data_url}})
+        except Exception as e:
+            print(f"No se pudo procesar {path}: {e}")  
+    
+    if not image_blocks:
+        raise ValueError("None of images are valid.")  
+        
+    client = OpenAI(api_key=api_key)
     # Encode the image into a data URL
-    encoded_image = encode_image_to_base64(image_path)
+    
     # For simplicity we assume JPEG images; adjust the MIME type if
     # necessary based on the actual image extension.
-    data_url = f"data:image/jpeg;base64,{encoded_image}"
+    
 
     # Prepare messages for the chat API.  The OpenAI python library
     # accepts a list of messages where the `content` field can be either a
@@ -60,16 +92,17 @@ def query_fashion_advisor(image_path: str, user_prompt: str, model: str = "gpt-4
         {
             "role": "system",
             "content": (
-                "Eres un estilista virtual experto en moda. Analiza la prenda "
-                "en la imagen y proporciona consejos de estilo personalizados "
-                "respondiendo siempre en español."
+                "Eres un estilista virtual experto en moda. Analiza las prendas "
+                "en las imágenes proporcionadas y responde siempre en español con consejos "
+                "personalizados de estilo y combinación de ropa. Ignora preguntas fuera del ámbito de moda."
             ),
         },
         {
             "role": "user",
             "content": [
                 {"type": "text", "text": user_prompt},
-                {"type": "image_url", "image_url": {"url": data_url}},
+                {"type": "text", "text": "Las siguientes imágenes representan prendas similares encontradas."},
+                *image_blocks
             ],
         },
     ]
@@ -77,9 +110,9 @@ def query_fashion_advisor(image_path: str, user_prompt: str, model: str = "gpt-4
     # Initialize the OpenAI client.  openai==1.x supports a Client class
     # but also offers module-level functions.  We use the module-level
     # interface here for simplicity.
-    openai.api_key = api_key
+    
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0.7,
@@ -89,5 +122,5 @@ def query_fashion_advisor(image_path: str, user_prompt: str, model: str = "gpt-4
         raise RuntimeError(f"Error al llamar al API de OpenAI: {exc}")
 
     # Extract and return the assistant's message content
-    reply = response.choices[0].message.get("content", "").strip()
+    reply = (response.choices[0].message.content or "").strip()
     return reply

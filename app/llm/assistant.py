@@ -14,7 +14,10 @@ from __future__ import annotations
 import os
 from typing import List, Dict, Tuple
 
-import openai
+from openai import OpenAI
+from load_dotenv import load_dotenv
+
+load_dotenv()
 
 # A minimal list of disallowed keywords.  This list can be extended
 # depending on the domain requirements.  Words are matched in a case
@@ -79,7 +82,7 @@ def _build_similar_images_description(similar_images: List[Dict[str, object]]) -
     for idx, item in enumerate(similar_images, start=1):
         category = item.get("category", "desconocida")
         distance = item.get("distance", 0.0)
-        lines.append(f"{idx}. Categoría: {category}, similitud: {1 - distance:.2f}")
+        lines.append(f"{idx}. Categoría: {category}, similitud: {distance:.2f}")
     return "\n".join(lines)
 
 
@@ -160,7 +163,6 @@ def ask_fashion_assistant(
         raise EnvironmentError(
             "La variable de entorno OPENAI_API_KEY no está configurada. Establece tu clave de API de OpenAI para utilizar el asistente."
         )
-    openai.api_key = api_key
 
     # Compose messages for chat model.  A system prompt sets the role and
     # guidelines; the user prompt contains our constructed message.
@@ -177,8 +179,9 @@ def ask_fashion_assistant(
     ]
 
     # Call the OpenAI API
+    client = OpenAI(api_key=api_key)
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0.7,
@@ -187,5 +190,5 @@ def ask_fashion_assistant(
     except Exception as exc:
         raise RuntimeError(f"Fallo al llamar al API de OpenAI: {exc}")
 
-    answer = response.choices[0].message.get("content", "").strip()
+    answer = response.choices[0].message.content or "".strip()
     return answer, prompt
