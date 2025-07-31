@@ -14,5 +14,6 @@
   "similar_images": "Imágenes similares",
   "no_similar": "No se encontraron imágenes similares.",
   "stylist_answer": "Consejo del estilista",
-  "no_answer": "No se pudo generar una respuesta."
+  "no_answer": "No se pudo generar una respuesta.",
+  "uploaded_images": "Imagen(es) subida(s)"
 }

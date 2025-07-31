@@ -14,5 +14,6 @@
   "similar_images": "Similar images",
   "no_similar": "No similar images found.",
   "stylist_answer": "Stylist's advice",
-  "no_answer": "Could not generate a response."
+  "no_answer": "Could not generate a response.",
+  "uploaded_images": "Uploaded images"
 }
