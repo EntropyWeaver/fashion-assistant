@@ -9,6 +9,7 @@ assistant's answer.
 """
 
 import os
+import base64
 from io import BytesIO
 from typing import List, Dict
 
@@ -16,6 +17,19 @@ import requests
 import streamlit as st
 from PIL import Image
 import json
+
+def _to_data_url(img: Image.Image) -> str:
+    """Return a data URL for the given image."""
+    buffered = BytesIO()
+    img.save(buffered, format="JPEG")
+    encoded = base64.b64encode(buffered.getvalue()).decode()
+    return f"data:image/jpeg;base64,{encoded}"
+
+
+def thumbnail_html(img: Image.Image, width: int = 150) -> str:
+    """Create HTML code for a clickable thumbnail that opens the image."""
+    data_url = _to_data_url(img)
+    return f"<a href='{data_url}' target='_blank'><img src='{data_url}' width='{width}'/></a>"
 
 if not 'lang' in st.session_state:
         st.session_state["lang"] = 'es'
@@ -65,14 +79,27 @@ def main() -> None:
     st.session_state["lang"] = lang
 
     # Inputs
-    uploaded_file = st.file_uploader(t["upload_label"], type=["jpg", "jpeg", "png"])
+    uploaded_files = st.file_uploader(
+        t["upload_label"], type=["jpg", "jpeg", "png"], accept_multiple_files=True
+    )
+    if uploaded_files:
+        st.subheader(t.get("uploaded_images", "Uploaded images"))
+        cols = st.columns(len(uploaded_files))
+        for col, up in zip(cols, uploaded_files):
+            try:
+                img = Image.open(up)
+                col.markdown(thumbnail_html(img), unsafe_allow_html=True)
+                col.caption(up.name)
+            except Exception:
+                col.write(up.name)
+
     query = st.text_input(t["query_label"], t["default_query"])
     k = st.number_input(
         label=t["recommendation_label"], min_value=1, max_value=10, value=5, step=1, help="Cantidad de prendas similares a mostrar"
     )
 
     if st.button(t["button"]):
-        if uploaded_file is None:
+        if not uploaded_files:
             st.warning(t["warning_image"])
         elif not query.strip():
             st.warning(t["warning_text"])
@@ -81,11 +108,11 @@ def main() -> None:
             with st.spinner(t["spinner"]):
                 try:
                     # Read file data into memory
-                    file_bytes = uploaded_file.getvalue()
+                    file_bytes = uploaded_files[0].getvalue()
                     result = call_backend(
                         api_url=backend_url,
                         image_file=file_bytes,
-                        filename=uploaded_file.name,
+                        filename=uploaded_files[0].name,
                         query=query,
                         k=int(k),
                         lang=st.session_state["lang"]
@@ -100,13 +127,14 @@ def main() -> None:
             if not similar_images:
                 st.write(t["no_similar"])
             else:
-                for path in similar_images:
+                cols = st.columns(len(similar_images))
+                for col, path in zip(cols, similar_images):
                     try:
                         img = Image.open(path)
-                        st.image(img, caption=os.path.basename(path), use_column_width=True)
+                        col.markdown(thumbnail_html(img), unsafe_allow_html=True)
+                        col.caption(os.path.basename(path))
                     except Exception:
-                        # If the image can't be loaded, display the path as text
-                        st.write(path)
+                        col.write(path)
 
             # Display the LLM answer
             answer = result.get("answer", "")
