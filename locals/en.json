@@ -1,0 +1,18 @@
+{
+  "title": "👗 Fashion Assistant",
+  "description": "Upload a picture of a garment and type your question. The system will search for similar items and offer styling advice.",
+  "upload_label": "Choose an image",
+  "query_label": "What is your fashion question?",
+  "default_query": "What can I pair this garment with?",
+  "recommendation_label": "Number of recommendations",
+  "recommendation_help": "How many similar garments to retrieve",
+  "button": "Search and get advice",
+  "warning_image": "Please upload an image before continuing.",
+  "warning_text": "Please enter a fashion-related question.",
+  "spinner": "Processing your request...",
+  "error_backend": "Error connecting to the backend",
+  "similar_images": "Similar images",
+  "no_similar": "No similar images found.",
+  "stylist_answer": "Stylist's advice",
+  "no_answer": "Could not generate a response."
+}

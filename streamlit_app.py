@@ -15,9 +15,12 @@ from typing import List, Dict
 import requests
 import streamlit as st
 from PIL import Image
+import json
 
+if not 'lang' in st.session_state:
+        st.session_state["lang"] = 'es'
 
-def call_backend(api_url: str, image_file: BytesIO, filename: str, query: str, k: int = 5) -> Dict[str, object]:
+def call_backend(api_url: str, image_file: BytesIO, filename: str, query: str, k: int = 5, lang: str = 'es') -> Dict[str, object]:
     """Send the uploaded image and query to the backend API.
 
     Parameters
@@ -39,35 +42,43 @@ def call_backend(api_url: str, image_file: BytesIO, filename: str, query: str, k
         Parsed JSON response from the backend.
     """
     files = {"image": (filename, image_file, "image/jpeg")}
-    data = {"text": query, "k": str(k)}
+    data = {"text": query, "k": str(k), "lang": lang}
     response = requests.post(api_url, files=files, data=data)
     response.raise_for_status()
     return response.json()
 
+    
+def load_translations(lang: str) -> dict:
+    path = f"locals/{lang}.json"
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
 
 def main() -> None:
     st.set_page_config(page_title="Asistente de Moda", page_icon="🧵")
-    st.title("👗 Asistente de Moda")
+    lang = st.selectbox("🌍Idioma / Language", ["es", "en"], index=0)
+    t = load_translations(lang)
+    st.title(t["title"])
     st.markdown(
-        "Sube una imagen de una prenda y formula tu consulta. El sistema "
-        "buscará prendas similares y te ofrecerá consejos de estilo."
+        t["description"]
     )
+    st.session_state["lang"] = lang
 
     # Inputs
-    uploaded_file = st.file_uploader("Elige una imagen", type=["jpg", "jpeg", "png"])
-    query = st.text_input("¿Cuál es tu consulta de moda?", "¿Con qué puedo combinar esta prenda?")
+    uploaded_file = st.file_uploader(t["upload_label"], type=["jpg", "jpeg", "png"])
+    query = st.text_input(t["query_label"], t["default_query"])
     k = st.number_input(
-        label="Número de recomendaciones", min_value=1, max_value=10, value=5, step=1, help="Cantidad de prendas similares a mostrar"
+        label=t["recommendation_label"], min_value=1, max_value=10, value=5, step=1, help="Cantidad de prendas similares a mostrar"
     )
 
-    if st.button("Buscar y obtener consejo"):
+    if st.button(t["button"]):
         if uploaded_file is None:
-            st.warning("Por favor, sube una imagen antes de continuar.")
+            st.warning(t["warning_image"])
         elif not query.strip():
-            st.warning("Por favor, introduce una consulta de moda.")
+            st.warning(t["warning_text"])
         else:
             backend_url = os.getenv("BACKEND_URL", "http://localhost:8000/query")
-            with st.spinner("Procesando tu solicitud..."):
+            with st.spinner(t["spinner"]):
                 try:
                     # Read file data into memory
                     file_bytes = uploaded_file.getvalue()
@@ -77,16 +88,17 @@ def main() -> None:
                         filename=uploaded_file.name,
                         query=query,
                         k=int(k),
+                        lang=st.session_state["lang"]
                     )
                 except Exception as exc:
-                    st.error(f"Error al conectar con el backend: {exc}")
+                    st.error(f"{t['error_backend']}: {exc}")
                     return
 
             # Display similar images
             similar_images: List[str] = result.get("similar_images", [])
-            st.subheader("Imágenes similares")
+            st.subheader(t["similar_images"])
             if not similar_images:
-                st.write("No se encontraron imágenes similares.")
+                st.write(t["no_similar"])
             else:
                 for path in similar_images:
                     try:
@@ -98,8 +110,8 @@ def main() -> None:
 
             # Display the LLM answer
             answer = result.get("answer", "")
-            st.subheader("Consejo del estilista")
-            st.write(answer or "No se pudo generar una respuesta.")
+            st.subheader(t["stylist_answer"])
+            st.write(answer or t["no_answer"])
 
 
 if __name__ == "__main__":

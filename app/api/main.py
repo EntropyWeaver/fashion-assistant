@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
         image: UploadFile = File(..., description="Imagen de prenda que el usuario sube"),
         text: str = Form(..., description="Consulta de moda del usuario"),
         k: int = Form(5, description="Número de imágenes similares a recuperar"),
+        lang: str = Form("es", description="Idioma del usuario ('es' o 'en')")
     ) -> JSONResponse:
         """
         Encuentra imágenes similares a una consulta y genera un consejo de moda.
@@ -87,7 +88,7 @@ def create_app() -> FastAPI:
         # resultados, se devuelve un mensaje indicativo.
         
         try:
-            answer = query_fashion_advisor(image_paths, text)
+            answer = query_fashion_advisor(image_paths, text, lang=lang)
         except Exception as exc:
             print("🧨 Excepción al llamar a query_fashion_advisor():", exc)
             traceback.print_exc()

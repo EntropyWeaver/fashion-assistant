@@ -17,7 +17,6 @@ import mimetypes
 from typing import List
 from openai import OpenAI
 from load_dotenv import load_dotenv
-
 from app.utils.image_encoding import encode_image_to_base64
 
 load_dotenv()
@@ -36,91 +35,83 @@ def get_data_url(image_path: str) -> str:
 
 
 
-def query_fashion_advisor(image_paths: List[str],
-                          user_prompt: str,
-                          model: str = "gpt-4o") -> str:
-    """Query the GPT‑4o model with a multimodal prompt consisting of text and an image.
 
-    Parameters
-    ----------
-    image_path : str
-        Path to the image that should be analysed by the assistant.
-    user_prompt : str
-        The user's natural language question or instruction.
-    model : str, default="gpt-4o"
-        The name of the OpenAI model to query.
-
-    Returns
-    -------
-    str
-        The assistant's reply.  Any leading or trailing whitespace is
-        stripped.  If the API key is not configured an exception will
-        propagate to the caller.
-    """
-    # Retrieve the API key
+def query_fashion_advisor(
+    image_paths: List[str],
+    user_prompt: str,
+    model: str = "gpt-4.1-nano",
+    lang: str = "es"
+) -> str:
+    """Consulta a GPT‑4o con un prompt multimodal formado por texto + imágenes."""
+    
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise EnvironmentError(
-            "La variable de entorno OPENAI_API_KEY no está configurada. Establece tu clave de API de OpenAI."
+            "La variable de entorno OPENAI_API_KEY no está configurada."
         )
-    # Coding all valid imgsas URLs data
+
+    # Traducción o configuración de instrucciones del sistema por idioma
+    system_prompts = {
+        "es": (
+            "Eres un estilista virtual experto en moda. Analiza las prendas "
+            "en las imágenes proporcionadas y responde siempre en español con consejos "
+            "personalizados de estilo y combinación de ropa. Ignora preguntas fuera del ámbito de moda."
+        ),
+        "en": (
+            "You are a virtual fashion stylist. Analyze the garments shown in the provided images "
+            "and always reply in English with personalized fashion advice and clothing combinations. "
+            "Ignore questions unrelated to fashion."
+        )
+    }
+
+    # Si se pasa un idioma no reconocido, usamos español como fallback
+    system_prompt = system_prompts.get(lang.lower(), system_prompts["es"])
+    print(system_prompt)
+    # Cargar imágenes como bloques base64 para el mensaje
     image_blocks = []
     for path in image_paths:
         try:
             data_url = get_data_url(path)
-            image_blocks.append({"type": "image_url",
-                                 "image_url": {"url": data_url}})
+            image_blocks.append({
+                "type": "image_url",
+                "image_url": {"url": data_url}
+            })
         except Exception as e:
-            print(f"No se pudo procesar {path}: {e}")  
+            print(f"⚠️ No se pudo procesar la imagen {path}: {e}")
     
     if not image_blocks:
-        raise ValueError("None of images are valid.")  
-        
-    client = OpenAI(api_key=api_key)
-    # Encode the image into a data URL
-    
-    # For simplicity we assume JPEG images; adjust the MIME type if
-    # necessary based on the actual image extension.
-    
+        raise ValueError("Ninguna de las imágenes es válida.")
 
-    # Prepare messages for the chat API.  The OpenAI python library
-    # accepts a list of messages where the `content` field can be either a
-    # string or a list of content parts.  When providing multimodal
-    # messages, we supply a list with dictionaries describing the type of
-    # each part.
+    # Construir mensajes para el modelo
     messages = [
         {
             "role": "system",
-            "content": (
-                "Eres un estilista virtual experto en moda. Analiza las prendas "
-                "en las imágenes proporcionadas y responde siempre en español con consejos "
-                "personalizados de estilo y combinación de ropa. Ignora preguntas fuera del ámbito de moda."
-            ),
+            "content": system_prompt
         },
         {
             "role": "user",
             "content": [
                 {"type": "text", "text": user_prompt},
-                {"type": "text", "text": "Las siguientes imágenes representan prendas similares encontradas."},
+                {"type": "text", "text": {
+                    "es": "Las siguientes imágenes representan prendas similares encontradas.",
+                    "en": "The following images show visually similar garments found in the catalog."
+                }.get(lang.lower())},
                 *image_blocks
-            ],
-        },
+            ]
+        }
     ]
-
-    # Initialize the OpenAI client.  openai==1.x supports a Client class
-    # but also offers module-level functions.  We use the module-level
-    # interface here for simplicity.
     
+    client = OpenAI(api_key=api_key)
+
     try:
         response = client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0.7,
-            max_tokens=400,
+            max_tokens=400
         )
     except Exception as exc:
         raise RuntimeError(f"Error al llamar al API de OpenAI: {exc}")
 
-    # Extract and return the assistant's message content
     reply = (response.choices[0].message.content or "").strip()
     return reply

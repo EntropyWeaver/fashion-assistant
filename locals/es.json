@@ -1,0 +1,18 @@
+{
+  "title": "👗 Asistente de Moda",
+  "description": "Sube una imagen de una prenda y formula tu consulta. El sistema buscará prendas similares y te ofrecerá consejos de estilo.",
+  "upload_label": "Elige una imagen",
+  "query_label": "¿Cuál es tu consulta de moda?",
+  "default_query": "¿Con qué puedo combinar esta prenda?",
+  "recommendation_label": "Número de recomendaciones",
+  "recommendation_help": "Cantidad de prendas similares a mostrar",
+  "button": "Buscar y obtener consejo",
+  "warning_image": "Por favor, sube una imagen antes de continuar.",
+  "warning_text": "Por favor, introduce una consulta de moda.",
+  "spinner": "Procesando tu solicitud...",
+  "error_backend": "Error al conectar con el backend",
+  "similar_images": "Imágenes similares",
+  "no_similar": "No se encontraron imágenes similares.",
+  "stylist_answer": "Consejo del estilista",
+  "no_answer": "No se pudo generar una respuesta."
+}

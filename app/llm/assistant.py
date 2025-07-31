@@ -16,6 +16,7 @@ from typing import List, Dict, Tuple
 
 from openai import OpenAI
 from load_dotenv import load_dotenv
+from streamlit_app import session_state
 
 load_dotenv()
 
@@ -120,7 +121,9 @@ def _build_prompt(user_query: str, similar_images: List[Dict[str, object]]) -> s
 
 
 def ask_fashion_assistant(
-    user_query: str, similar_images: List[Dict[str, object]], model: str = "gpt-4o"
+    user_query: str,
+    similar_images: List[Dict[str, object]],
+    model: str = "gpt-4o",
 ) -> Tuple[str, str]:
     """Generate a fashion advice response using OpenAI's chat model.
 
@@ -172,7 +175,7 @@ def ask_fashion_assistant(
             "content": (
                 "Eres un estilista virtual que ofrece consejos de moda personalizados. "
                 "Tu objetivo es ayudar al usuario a combinar prendas, sugerir colores y accesorios "
-                "y explicar por qué tus recomendaciones funcionan. Responde siempre en español."
+                f"y explicar por qué tus recomendaciones funcionan. Responde siempre en español."
             ),
         },
         {"role": "user", "content": prompt},
