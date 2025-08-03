@@ -15,5 +15,8 @@
   "no_similar": "No se encontraron imágenes similares.",
   "stylist_answer": "Consejo del estilista",
   "no_answer": "No se pudo generar una respuesta.",
-  "uploaded_images": "Imagen(es) subida(s)"
+  "uploaded_images": "Imagen(es) subida(s)",
+  "error_invalid_format": "Formato de imagen no soportado. Usa JPEG o PNG.",
+  "error_too_large": "La imagen excede {size} MB.",
+  "error_too_high_res": "La resolución máxima es {width}x{height}."
 }

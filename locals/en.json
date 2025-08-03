@@ -15,5 +15,8 @@
   "no_similar": "No similar images found.",
   "stylist_answer": "Stylist's advice",
   "no_answer": "Could not generate a response.",
-  "uploaded_images": "Uploaded images"
+  "uploaded_images": "Uploaded images",
+  "error_invalid_format": "Unsupported image format. Please upload JPEG or PNG.",
+  "error_too_large": "Image exceeds {size} MB.",
+  "error_too_high_res": "Maximum resolution is {width}x{height}."
 }
