@@ -25,7 +25,11 @@ MAX_WIDTH = 2000
 MAX_HEIGHT = 2000
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
 
-
+def clear_cache():
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    st.rerun()
+    
 def validate_image_file(uploaded_file, translations: dict) -> str | None:
     """Return an error message if the image is invalid, otherwise None."""
     try:
@@ -114,6 +118,9 @@ def main() -> None:
     st.markdown(
         t["description"]
     )
+    if st.button("New search"):
+        
+        clear_cache()
     st.session_state["lang"] = lang
 
     # Inputs
@@ -170,6 +177,9 @@ def main() -> None:
                     )
                     st.session_state["similar_images"] = result.get("similar_images", [])
                     st.session_state["answer"] = result.get("answer", None)
+                    if st.session_state["answer"] == "refusal":
+                        st.warning(t["refusal"])
+                        return
                 except Exception as exc:
                     st.error(f"{t['error_backend']}: {exc}")
                     return
@@ -196,13 +206,13 @@ def main() -> None:
                         # Zoom button con key única
                     if col.button(f"👁 Ver en grande", key=f"zoom_{idx}"):
                         with col.expander(f"👁 Ver en grande: {os.path.basename(path)}"):
-                            st.image(img, use_container_width=True)
+                            st.image(img, use_column_width=True)
 
                 except Exception as e:
                     col.write(f"Error: {e}")
 
     # Mostrar la respuesta del estilista SIEMPRE que exista
-    if "answer" in st.session_state:
+    if "answer" in st.session_state and st.session_state["answer"] != "refusal":
         answer = st.session_state["answer"]
         st.subheader(t["stylist_answer"])
         

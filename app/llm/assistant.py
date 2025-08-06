@@ -8,7 +8,9 @@ sending requests containing offensive, sexual or violent language.  If
 such language is detected the assistant will respond politely without
 calling the LLM API.
 """
-
+'''
+In the latest versions these functions, globals, etc. will be treated as an assistant utils tools.
+'''
 from __future__ import annotations
 
 import os
@@ -16,7 +18,7 @@ from typing import List, Dict, Tuple
 
 from openai import OpenAI
 from load_dotenv import load_dotenv
-from streamlit_app import session_state
+import json
 
 load_dotenv()
 
@@ -36,7 +38,10 @@ BANNED_KEYWORDS = {
     "puta",
     "mierda",
 }
-
+def banned_dictionary_from_json(path: str) -> json:
+    json_path = path(path)
+    json_path = 'locals/ban_kwds.json'
+    json.load(json_path)
 
 def contains_offensive_language(text: str) -> bool:
     """Check whether the input text contains any banned keyword.
@@ -59,8 +64,9 @@ def contains_offensive_language(text: str) -> bool:
         if word in lower_text:
             return True
     return False
+    
 
-
+#used in first commit, base64 encoding is preferred
 def _build_similar_images_description(similar_images: List[Dict[str, object]]) -> str:
     """Construct a human‑readable summary of the similar images.
 
@@ -107,6 +113,7 @@ def _build_prompt(user_query: str, similar_images: List[Dict[str, object]]) -> s
     str
         The full prompt string.
     """
+    #just in case you need temporary create a test without using base encoding
     description = _build_similar_images_description(similar_images)
     prompt = (
         "Eres un estilista virtual experto en moda y tendencias. "
@@ -155,7 +162,7 @@ def ask_fashion_assistant(
     # Check for offensive content
     if contains_offensive_language(user_query):
         refusal = "Lo siento, no puedo ayudarte con esa solicitud."
-        return refusal, user_query
+        return {"refusal": refusal, "user_query": user_query}
 
     # Build prompt with similar images information
     prompt = _build_prompt(user_query, similar_images)

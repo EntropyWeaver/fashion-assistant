@@ -18,5 +18,6 @@
   "uploaded_images": "Imagen(es) subida(s)",
   "error_invalid_format": "Formato de imagen no soportado. Usa JPEG o PNG.",
   "error_too_large": "La imagen excede {size} MB.",
-  "error_too_high_res": "La resolución máxima es {width}x{height}."
+  "error_too_high_res": "La resolución máxima es {width}x{height}.",
+  "refusal": "🚨 Lo siento. No puedo ayudarte con esa solicitud 🚨"
 }

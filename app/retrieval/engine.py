@@ -11,9 +11,8 @@ the precomputed index and label mapping.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import Iterable, List, Dict
+from typing import List, Dict
 
 import numpy as np
 import pandas as pd

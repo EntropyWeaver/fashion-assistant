@@ -14,9 +14,11 @@ from typing import List
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.retrieval.engine import RetrievalEngine
 from app.services.fashion_advisor import query_fashion_advisor
+from app.utils.filters import contains_offensive_language
 
 
 def create_app() -> FastAPI:
@@ -48,13 +50,15 @@ def create_app() -> FastAPI:
         """
         Encuentra imágenes similares a una consulta y genera un consejo de moda.
 
-        La ruta acepta una imagen de prenda y una consulta escrita en español.
+        La ruta acepta una imagen de prenda y una consulta escrita.
         Primero, la imagen se guarda temporalmente y se procesa con el motor
         de recuperación para obtener las `k` imágenes más similares. Luego
         se construye un prompt que incluye la información de dichas
         similitudes y la consulta original del usuario. Finalmente se
         utiliza el modelo de lenguaje para generar una respuesta de moda.
         """
+        if contains_offensive_language(text):
+            return JSONResponse({"answer": "refusal"})
         # Guardar la imagen recibida en un fichero temporal dentro de /tmp
         try:
             contents = await image.read()

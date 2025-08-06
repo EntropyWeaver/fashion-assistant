@@ -12,7 +12,6 @@ retrieved from the ``OPENAI_API_KEY`` environment variable.
 from __future__ import annotations
 
 import os
-from typing import Tuple
 import mimetypes
 from typing import List
 from openai import OpenAI
@@ -49,7 +48,7 @@ def query_fashion_advisor(
         raise EnvironmentError(
             "La variable de entorno OPENAI_API_KEY no está configurada."
         )
-
+    
     # Traducción o configuración de instrucciones del sistema por idioma
     system_prompts = {
         "es": (
