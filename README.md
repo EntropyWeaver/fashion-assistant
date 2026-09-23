@@ -30,11 +30,13 @@ Discover fashion like never before: this application lets users upload an image 
 
 ## 📦 Run Locally
 
+Use Python 3.11: the pinned `faiss-cpu==1.7.4` does not provide a Python 3.12 wheel. Set `OPENAI_API_KEY` in your environment before sending a fashion query; keep it out of Git.
+
 ```bash
 git clone https://github.com/EntropyWeaver/fashion-assistant.git
 cd fashion-assistant
-python -m venv venv
-source venv/bin/activate # or venv\Scripts\activate
+python3.11 -m venv venv # on Windows: py -3.11 -m venv venv
+source venv/bin/activate # on Windows cmd: venv\Scripts\activate.bat
 pip install -r requirements.txt
 
 # Start backend
@@ -45,6 +47,19 @@ streamlit run streamlit_app.py
 ```
 
 You can also run `run_app.bat` (Windows only) for one-click startup with timeout syncing.
+
+## 🧪 Tests
+
+With Python 3.11, install the test dependencies and run the local suite without making API calls:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+The suite covers the API boundary, file cleanup, message construction, keyword filtering and catalog search with a mocked embedding model. To exercise real OpenCLIP embeddings without an API key, initialize `RetrievalEngine('data')` and search one of the sample garments. The first run downloads model weights.
+
+After setting `OPENAI_API_KEY` for a test project, run `python -m scripts.smoke_live` from the repository root to make one real request with one retrieved image. This is separate from pytest because it uses paid API capacity.
 
 ---
 
@@ -72,7 +87,7 @@ You can also run `run_app.bat` (Windows only) for one-click startup with timeout
 
 ## 📘 Want the Nerdy Stuff?
 
-See [📘 ](./extra_notes.md)[`Extra Notes`](./extra_notes.md) for a deep dive into:
+See [Extra Notes](./extra_notes.md) for a deep dive into:
 
 * Multimodal prompting via base64
 * Cosine similarity vs. L2 in FAISS
@@ -123,12 +138,13 @@ To ensure respectful interaction with the assistant, we implemented a local filt
 ```python
 if contains_offensive_language(text):
     return JSONResponse({"answer": "refusal"})
+```
 
-### 🛡️ Guardrail Architecture
+### 🛡️ Possible future guardrails
 
 1. **KeywordGuard** – cached set lookup (O(1))
 2. **ToxicityGuard** – Detoxify ML model for nuanced insults
 3. **OpenAI Moderation** – optional last-resort
 4. **RateLimiter** – blocks abusive users (HTTP 429)
 
-Pipeline short-circuits on first positive match, saving compute and tokens.
+The current implementation only checks the cached keyword list. The other components listed above are ideas for future work.
