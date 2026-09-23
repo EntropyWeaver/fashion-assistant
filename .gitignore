@@ -42,4 +42,4 @@ models/
 Thumbs.db
 
 # Carpeta de datos (si no es pública)
-data/
+#data/
