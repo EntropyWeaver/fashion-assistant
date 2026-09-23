@@ -32,7 +32,7 @@ Discover fashion like never before: this application lets users upload an image 
 
 ```bash
 git clone https://github.com/EntropyWeaver/fashion-assistant.git
-cd fashion-advisor
+cd fashion-assistant
 python -m venv venv
 source venv/bin/activate # or venv\Scripts\activate
 pip install -r requirements.txt

@@ -10,6 +10,8 @@ the full prompt sent to the LLM and the final answer.
 """
 import traceback
 import os
+import tempfile
+from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, UploadFile
@@ -59,58 +61,50 @@ def create_app() -> FastAPI:
         """
         if contains_offensive_language(text):
             return JSONResponse({"answer": "refusal"})
-        # Guardar la imagen recibida en un fichero temporal dentro de /tmp
+        # Guardar la imagen con un nombre generado por el servidor.
         try:
             contents = await image.read()
             if not contents:
                 raise HTTPException(status_code=400, detail="La imagen está vacía")
-        except Exception:
-            raise HTTPException(status_code=400, detail="No se pudo leer la imagen")
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="No se pudo leer la imagen") from exc
 
         tmp_dir = "temp"
         os.makedirs(tmp_dir, exist_ok=True)
-        tmp_path = os.path.join(tmp_dir, image.filename)
+        suffix = Path(image.filename or "").suffix.lower()
+        if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+            raise HTTPException(status_code=400, detail="Formato de imagen no soportado")
         try:
-            with open(tmp_path, "wb") as f:
+            with tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, dir=tmp_dir, delete=False) as f:
+                tmp_path = f.name
                 f.write(contents)
-        except Exception:
-            raise HTTPException(status_code=500, detail="No se pudo guardar la imagen temporal")
-
-        # Recuperar imágenes similares usando el motor de recuperación
-        try:
-            similar_items = retrieval_engine.search(tmp_path, k=max(1, int(k)))
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Error en la búsqueda FAISS: {exc}")
+            raise HTTPException(status_code=500, detail="No se pudo guardar la imagen temporal") from exc
 
-        #Usar todas las imagenes que devuelva FAISS
-        image_paths: List[str]
-        if similar_items:
-            image_paths = [item["image"] for item in similar_items]
-        else:
-            image_paths = [tmp_path]
-        # Enviar la imagen más similar junto con la consulta al modelo GPT‑4o. Si no hay
-        # resultados, se devuelve un mensaje indicativo.
-        
         try:
-            answer = query_fashion_advisor(image_paths, text, lang=lang)
-        except Exception as exc:
-            print("🧨 Excepción al llamar a query_fashion_advisor():", exc)
-            traceback.print_exc()
-            raise HTTPException(status_code=500, detail="Error interno al generar la respuesta.")
+            try:
+                similar_items = retrieval_engine.search(tmp_path, k=max(1, int(k)))
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"Error en la búsqueda FAISS: {exc}") from exc
 
-        # Limpiar el archivo temporal
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            # No hacemos que el fallo en la limpieza interrumpa la petición
-            pass
+            image_paths: List[str] = [item["image"] for item in similar_items] if similar_items else [tmp_path]
+            try:
+                answer = query_fashion_advisor(image_paths, text, lang=lang)
+            except Exception as exc:
+                print("🧨 Excepción al llamar a query_fashion_advisor():", exc)
+                traceback.print_exc()
+                raise HTTPException(status_code=500, detail="Error interno al generar la respuesta.") from exc
 
-        return JSONResponse(
-            {
-                "similar_images": [item["image"] for item in similar_items],
-                "answer": answer,
-            }
-        )
+            return JSONResponse(
+                {"similar_images": [item["image"] for item in similar_items], "answer": answer}
+            )
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
     app.include_router(router)
     return app

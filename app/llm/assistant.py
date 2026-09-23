@@ -8,10 +8,9 @@ sending requests containing offensive, sexual or violent language.  If
 such language is detected the assistant will respond politely without
 calling the LLM API.
 """
-'''
-In the latest versions these functions, globals, etc. will be treated as an assistant utils tools.
-'''
 from __future__ import annotations
+
+# Legacy assistant helpers retained for experimentation.
 
 import os
 from typing import List, Dict, Tuple
