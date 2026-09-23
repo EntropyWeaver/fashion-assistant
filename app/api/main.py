@@ -16,11 +16,11 @@ from typing import List
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from starlette.status import HTTP_400_BAD_REQUEST
+from starlette.concurrency import run_in_threadpool
 
 from app.retrieval.engine import RetrievalEngine
 from app.services.fashion_advisor import query_fashion_advisor
-from app.utils.filters import contains_offensive_language
+from app.services.query_moderation import ModerationUnavailable, moderate_query
 
 
 def create_app() -> FastAPI:
@@ -45,7 +45,7 @@ def create_app() -> FastAPI:
     @router.post("/query")
     async def query(
         image: UploadFile = File(..., description="Imagen de prenda que el usuario sube"),
-        text: str = Form(..., description="Consulta de moda del usuario"),
+        text: str = Form(..., min_length=1, max_length=800, description="Consulta de moda del usuario"),
         k: int = Form(5, description="Número de imágenes similares a recuperar"),
         lang: str = Form("es", description="Idioma del usuario ('es' o 'en')")
     ) -> JSONResponse:
@@ -59,7 +59,13 @@ def create_app() -> FastAPI:
         similitudes y la consulta original del usuario. Finalmente se
         utiliza el modelo de lenguaje para generar una respuesta de moda.
         """
-        if contains_offensive_language(text):
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="La consulta está vacía")
+        try:
+            moderation = await run_in_threadpool(moderate_query, text)
+        except ModerationUnavailable as exc:
+            raise HTTPException(status_code=503, detail="Filtro de consultas temporalmente no disponible") from exc
+        if moderation.blocked:
             return JSONResponse({"answer": "refusal"})
         # Guardar la imagen con un nombre generado por el servidor.
         try:

@@ -57,7 +57,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-The suite covers the API boundary, file cleanup, message construction, keyword filtering and catalog search with a mocked embedding model. To exercise real OpenCLIP embeddings without an API key, initialize `RetrievalEngine('data')` and search one of the sample garments. The first run downloads model weights.
+The suite covers the API boundary, file cleanup, multilingual query moderation, message construction, and catalog search with a mocked embedding model. To exercise real OpenCLIP embeddings without an API key, initialize `RetrievalEngine('data')` and search one of the sample garments. The first run downloads model weights.
 
 After setting `OPENAI_API_KEY` for a test project, run `python -m scripts.smoke_live` from the repository root to make one real request with one retrieved image. This is separate from pytest because it uses paid API capacity.
 
@@ -113,38 +113,10 @@ MIT — free to use, adapt, or extend. Fashion belongs to everyone.
 - **Deprecated:** The simplified label approach was removed as it degraded performance.
 - **Still useful for:** Testing guardrails, generating DataFrames of retrieval results.
 
-### ⚠️ Guardrail with Cached Keyword Filtering
+### 🛡️ Query moderation
 
-Before processing the user input, the application checks for offensive language 
-using a locally cached list of banned keywords.
+Before saving an uploaded image, searching FAISS or calling OpenAI, the API evaluates the query with Detoxify's **multilingual** model on CPU. The model runs locally and is loaded once on the first query; that first use downloads roughly 1 GB of weights and may be slow. Production deployments should preload the weights. No second OpenAI request is needed for moderation.
 
-We use `functools.lru_cache` to load the list once from `ban_kwds.json`, making 
-the validation extremely fast even if called repeatedly.
+The policy in `app/services/query_moderation.py` looks for strong evidence of insults, identity attacks and threats. High general toxicity by itself does not block harsh criticism of clothing, such as “Este vestido es una puta mierda, ¿me enseñas otro?”. It checks clauses separately so an unrelated insult appended to a fashion question can still be caught. A blocked query returns the existing localized refusal. If the classifier is unavailable, the API returns HTTP 503 without contacting FAISS or OpenAI.
 
-This helps block inappropriate requests early in the flow without involving any 
-external API or image processing logic.
-
-### 🛡️ Offensive Language Guardrail
-
-To ensure respectful interaction with the assistant, we implemented a local filtering mechanism before any request is processed. This prevents inappropriate prompts from being sent to the LLM or triggering the similarity search engine.
-
-**Highlights:**
-- Banned words are loaded from a JSON file using `@lru_cache` for efficiency.
-- The guardrail checks user input immediately upon receiving the request.
-- If offensive content is detected, a refusal message is returned without processing the image or calling the LLM.
-- Multilingual support (EN/ES) with tailored refusal messages.
-
-**Backend logic:**
-```python
-if contains_offensive_language(text):
-    return JSONResponse({"answer": "refusal"})
-```
-
-### 🛡️ Possible future guardrails
-
-1. **KeywordGuard** – cached set lookup (O(1))
-2. **ToxicityGuard** – Detoxify ML model for nuanced insults
-3. **OpenAI Moderation** – optional last-resort
-4. **RateLimiter** – blocks abusive users (HTTP 429)
-
-The current implementation only checks the cached keyword list. The other components listed above are ideas for future work.
+These thresholds are starting points measured against a small set of Spanish and English examples. Detoxify was trained for toxic comments and can make mistakes on fashion queries, especially idioms, descriptions of garments and personal distress. Evaluate additional examples before relying on it as a comprehensive safety system. The old word-list code remains in `app/utils/filters.py` for experiments but is no longer part of the API request path.
